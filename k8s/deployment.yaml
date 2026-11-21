@@ -1,0 +1,45 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: forecast-service
+  labels: {app: forecast-service}
+spec:
+  replicas: 2
+  selector:
+    matchLabels: {app: forecast-service}
+  template:
+    metadata:
+      labels: {app: forecast-service}
+    spec:
+      volumes:
+        - name: models
+          persistentVolumeClaim: {claimName: forecast-models}
+      initContainers:
+        # Copy the model baked into the image onto the volume, if none is there yet.
+        - name: seed-model
+          image: forecast-service:local
+          imagePullPolicy: IfNotPresent
+          securityContext: {runAsUser: 0}
+          command: ["sh", "-c", "cp -n /app/models/model.json /models/model.json; chown -R 10001 /models"]
+          volumeMounts: [{name: models, mountPath: /models}]
+      containers:
+        - name: api
+          image: forecast-service:local
+          imagePullPolicy: IfNotPresent
+          ports: [{containerPort: 8080}]
+          env:
+            - {name: MODEL_PATH, value: /models/model.json}
+          volumeMounts: [{name: models, mountPath: /models, readOnly: true}]
+          livenessProbe:          # restart the container if the process hangs
+            httpGet: {path: /health, port: 8080}
+            periodSeconds: 10
+          readinessProbe:         # only send traffic once a model is loaded
+            httpGet: {path: /ready, port: 8080}
+            periodSeconds: 5
+          resources:
+            requests: {cpu: 100m, memory: 128Mi}
+            limits: {cpu: 500m, memory: 256Mi}
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 10001
+            allowPrivilegeEscalation: false

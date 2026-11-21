@@ -1,0 +1,11 @@
+# Shared storage for the model file. ReadWriteOnce works on a single-node cluster (kind);
+# in the cloud you would store the model in S3 / GCS instead.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: forecast-models
+spec:
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests:
+      storage: 100Mi

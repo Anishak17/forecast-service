@@ -1,0 +1,24 @@
+services:
+  api:
+    build: .
+    image: forecast-service:local
+    ports: ["8080:8080"]
+    volumes:
+      - models:/app/models-live
+    environment:
+      MODEL_PATH: /app/models-live/model.json
+    depends_on:
+      trainer:
+        condition: service_completed_successfully
+
+  # One-off job: trains a model into the shared volume, then exits.
+  trainer:
+    image: forecast-service:local
+    build: .
+    user: "0"
+    volumes:
+      - models:/app/models-live
+    command: ["python", "-m", "forecast.train", "/tmp/alarms.csv", "/app/models-live/model.json"]
+
+volumes:
+  models:
